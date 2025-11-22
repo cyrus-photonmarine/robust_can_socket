@@ -1,5 +1,5 @@
-#ifndef CANSOCKET_H
-#define CANSOCKET_H
+#ifndef CANSOCKET_H_
+#define CANSOCKET_H_
 
 #include <linux/can.h>
 #include <linux/can/raw.h>
@@ -52,4 +52,4 @@ private:
     std::atomic<bool> m_isSocketValid{true}; 
 };
 
-#endif // CANSOCKET_H
+#endif // CANSOCKET_H_

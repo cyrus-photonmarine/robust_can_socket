@@ -1,4 +1,5 @@
-#pragma once
+#ifndef SOCKET_CAN_MSG_H_
+#define SOCKET_CAN_MSG_H_
 
 #include <cstdint>
 #include <vector>
@@ -22,3 +23,5 @@ struct CanMessage {
         return std::vector<uint8_t>(data, data + dlc);
     }
 };
+
+#endif // SOCKET_CAN_MSG_H_
