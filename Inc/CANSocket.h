@@ -23,20 +23,12 @@
 
 class CANSocket {
 public:
-    // Constructor and destructor
     CANSocket(const std::string& interfaceName);
     ~CANSocket();
 
-    // Initialize the CAN channel
     bool initialize();
-
-    // Close the CAN channel
     void close();
-
-    // Send a CAN message
     bool sendMessage(uint32_t id, const std::vector<uint8_t>& data);
-
-    // Receive a CAN message
     bool receiveMessage(uint32_t& id, std::vector<uint8_t>& data, uint64_t& timestamp);
 
 
