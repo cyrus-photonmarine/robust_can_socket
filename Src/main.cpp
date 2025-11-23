@@ -53,16 +53,13 @@ void recvLoop(socketcan::CANSocket *socket) {
   uint32_t id;
   std::vector<uint8_t> data;
   uint64_t timestamp;
+  socketcan::CanMessage msg;
 
   while (running) {
-    socketcan::CanMessage msg;
     if (socket->receiveMessage(id, data, timestamp)) {
-      msg.id = id;
-      msg.timestamp_us = timestamp;
-      msg.dlc = data.size();
-      std::copy(data.begin(), data.end(), msg.data);
-      msg.print();
+      msg = socketcan::CanMessage(id, data, timestamp);
       if (std::find(RX_IDS.begin(), RX_IDS.end(), msg.id) != RX_IDS.end()) {
+	  msg.print();
       }
     } else if (errno == ENOBUFS || errno == ENETDOWN) {
       std::cerr << "[RECV] Socket error, restarting...\n";
