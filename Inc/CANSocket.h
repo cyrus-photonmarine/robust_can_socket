@@ -18,9 +18,6 @@
 #define SensorCAN           "can1"
 #define Steering_Motor_CAN  "can2"
 
-
-
-
 class CANSocket {
 public:
     CANSocket(const std::string& interfaceName);
@@ -33,14 +30,13 @@ public:
 
 
 private:
-    std::string m_interfaceName;  // CAN interface name, e.g., "can0"
-    int m_socket;                 // Socket descriptor
-    struct sockaddr_can m_addr;   // Socket address
-    struct ifreq m_ifr;           // Network interface configuration
+    std::string m_interfaceName;  
+    int m_socket;                 
+    struct sockaddr_can m_addr;   
+    struct ifreq m_ifr;           
     std::mutex m_socketMutex;
     int m_rxFailureCount;
     int m_txFailureCount;
-
     std::atomic<bool> m_isSocketValid{true}; 
 };
 
