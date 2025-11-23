@@ -7,17 +7,14 @@
 #include <iostream>
 #include <mutex>
 
-// Constructor
 CANSocket::CANSocket(const std::string& interfaceName)
     : m_interfaceName(interfaceName), m_socket(-1),
       m_rxFailureCount(0), m_txFailureCount(0) {}
 
-// Destructor
 CANSocket::~CANSocket() {
     close();
 }
 
-// Initialize the CAN channel
 bool CANSocket::initialize() {
     std::lock_guard<std::mutex> lock(m_socketMutex);
     m_isSocketValid = false;  
@@ -73,7 +70,6 @@ bool CANSocket::initialize() {
 }
 
 
-// Close the CAN channel
 void CANSocket::close() {
     std::lock_guard<std::mutex> lock(m_socketMutex);
 
@@ -85,7 +81,6 @@ void CANSocket::close() {
     m_isSocketValid = false;
 }
 
-// Send a CAN message
 bool CANSocket::sendMessage(uint32_t id, const std::vector<uint8_t>& data) {
     // Try write without lock first
     if (!m_isSocketValid) {
@@ -132,7 +127,6 @@ bool CANSocket::sendMessage(uint32_t id, const std::vector<uint8_t>& data) {
     return false;
 }
 
-// Receive a CAN message
 bool CANSocket::receiveMessage(uint32_t& id, std::vector<uint8_t>& data, uint64_t& timestamp) {
     std::lock_guard<std::mutex> lock(m_socketMutex);
 
