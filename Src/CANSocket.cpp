@@ -19,6 +19,13 @@ std::vector<uint8_t> CanMessage::toVector() const {
   return std::vector<uint8_t>(data, data + dlc);
 }
 
+void CanMessage::print() {
+    std::cout << "[RECV] ID: 0x" << std::hex << msg.id << "  Data:";
+    for (int i = 0; i < msg.dlc; ++i)
+        std::cout << " " << std::hex << static_cast<int>(msg.data[i]);
+    std::cout << std::dec << std::endl;
+}
+
 CANSocket::CANSocket(const std::string& interfaceName)
     : m_interfaceName(interfaceName), m_socket(-1),
       m_rxFailureCount(0), m_txFailureCount(0) {}

@@ -26,6 +26,7 @@ struct CanMessage {
     CanMessage();
     CanMessage(uint32_t msg_id, const std::vector<uint8_t>& vec_data, uint64_t ts = 0);
     std::vector<uint8_t> toVector() const; 
+    void print() const;
 };
 
 class CANSocket {
