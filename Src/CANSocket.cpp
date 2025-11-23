@@ -7,6 +7,7 @@
 #include <thread>
 #include <unistd.h>
 
+namespace socketcan {
 CanMessage::CanMessage() : id(0), dlc(0), data{0}, timestamp_us(0) {}
 CanMessage::CanMessage(uint32_t msg_id, const std::vector<uint8_t> &vec_data,
                        uint64_t ts)
@@ -174,3 +175,4 @@ bool CANSocket::receiveMessage(uint32_t &id, std::vector<uint8_t> &data,
 
   return true;
 }
+} // namespace socketcan

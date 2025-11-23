@@ -17,6 +17,7 @@
 #define SensorCAN "can1"
 #define Steering_Motor_CAN "can2"
 
+namespace socketcan {
 struct CanMessage {
   uint32_t id;
   uint8_t dlc;
@@ -50,5 +51,6 @@ private:
   int m_txFailureCount;
   std::atomic<bool> m_isSocketValid{true};
 };
+} // namespace socketcan
 
 #endif // CANSOCKET_H_

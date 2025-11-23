@@ -15,7 +15,7 @@ std::atomic<bool> running{true};
 std::array<uint32_t, 8> RX_IDS = {0x101, 0x102, 0x103, 0x201,
                                   0x202, 0x203, 0x301, 0x302};
 
-void sendLoop(CANSocket *socket) {
+void sendLoop(socketcan::CANSocket *socket) {
   std::array<std::chrono::steady_clock::time_point, TX_MSGS_LEN> nextSend;
   auto now = std::chrono::steady_clock::now();
   for (int i = 0; i < TX_MSGS_LEN; ++i) {
@@ -48,14 +48,14 @@ void sendLoop(CANSocket *socket) {
   }
 }
 
-void recvLoop(CANSocket *socket) {
+void recvLoop(socketcan::CANSocket *socket) {
 
   uint32_t id;
   std::vector<uint8_t> data;
   uint64_t timestamp;
 
   while (running) {
-    CanMessage msg;
+    socketcan::CanMessage msg;
     if (socket->receiveMessage(id, data, timestamp)) {
       if (std::find(RX_IDS.begin(), RX_IDS.end(), msg.id) != RX_IDS.end()) {
         msg.print();
@@ -79,7 +79,7 @@ void signalHandler(int) {
 int main() {
   std::signal(SIGINT, signalHandler);
 
-  CANSocket socket("vcan0");
+  socketcan::CANSocket socket("vcan0");
   if (!socket.initialize()) {
     std::cerr << "Failed to initialize CAN interface\n";
     return 1;
