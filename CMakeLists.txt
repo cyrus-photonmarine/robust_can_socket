@@ -8,8 +8,6 @@ include_directories(${CMAKE_SOURCE_DIR}/Inc)
 
 file(GLOB SOURCES
     ${CMAKE_SOURCE_DIR}/Src/*.cpp
-    ${CMAKE_SOURCE_DIR}/Inc/CANMessage.cpp
-
 )
 
 add_executable(robust_can_socket ${SOURCES})

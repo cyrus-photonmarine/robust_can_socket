@@ -18,6 +18,16 @@
 #define SensorCAN           "can1"
 #define Steering_Motor_CAN  "can2"
 
+struct CanMessage {
+    uint32_t id;
+    uint8_t dlc;
+    uint8_t data[8];  
+    uint64_t timestamp_us;  
+    CanMessage();
+    CanMessage(uint32_t msg_id, const std::vector<uint8_t>& vec_data, uint64_t ts = 0);
+    std::vector<uint8_t> toVector() const; 
+};
+
 class CANSocket {
 public:
     CANSocket(const std::string& interfaceName);

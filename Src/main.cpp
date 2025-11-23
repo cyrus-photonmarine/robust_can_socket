@@ -1,5 +1,4 @@
 #include "CANSocket.h"
-#include "CANMessage.h"  
 #include <iostream>
 #include <thread>
 #include <atomic>
