@@ -37,38 +37,37 @@ CANSocket::~CANSocket() { close(); }
 bool CANSocket::initialize() {
   std::lock_guard<std::mutex> lock(m_socketMutex);
   m_isSocketValid = false;
+  const int restart_ms = 100;
+  m_socket = -1;
 
-  while (true) {
+  // One Socket to rule them all. One loop to find them.
+  do {
     m_socket = socket(PF_CAN, SOCK_RAW, CAN_RAW);
     if (m_socket < 0) {
       perror("socket");
       std::cerr << "[CANSocket] Waiting for CAN interface: " << m_interfaceName
                 << " to become available (socket failed)" << std::endl;
       std::this_thread::sleep_for(std::chrono::seconds(1));
-      continue;
+    } else {
+      setsockopt(m_socket, SOL_CAN_RAW, 6, &restart_ms, sizeof(restart_ms));
+      std::strncpy(m_ifr.ifr_name, m_interfaceName.c_str(), IFNAMSIZ - 1);
+      if (ioctl(m_socket, SIOCGIFINDEX, &m_ifr) < 0) {
+        perror("ioctl");
+        std::cerr << "[CANSocket] Waiting for CAN interface: "
+                  << m_interfaceName << " to become available (ioctl failed)"
+                  << std::endl;
+        ::close(m_socket);
+        m_socket = -1;
+      }
     }
+  } while (m_socket < 0);
 
-    int restart_ms = 100;
-    setsockopt(m_socket, SOL_CAN_RAW, 6, &restart_ms, sizeof(restart_ms));
-
-    std::strncpy(m_ifr.ifr_name, m_interfaceName.c_str(), IFNAMSIZ - 1);
-    if (ioctl(m_socket, SIOCGIFINDEX, &m_ifr) < 0) {
-      perror("ioctl");
-      std::cerr << "[CANSocket] Waiting for CAN interface: " << m_interfaceName
-                << " to become available (ioctl failed)" << std::endl;
-      ::close(m_socket);
-      m_socket = -1;
-      std::this_thread::sleep_for(std::chrono::seconds(1));
-      continue;
-    }
-
-    break;
-  }
-
+  // One Socket to bring them all
   std::memset(&m_addr, 0, sizeof(m_addr));
   m_addr.can_family = AF_CAN;
   m_addr.can_ifindex = m_ifr.ifr_ifindex;
 
+  // and in the darkness bind them.
   if (bind(m_socket, (struct sockaddr *)&m_addr, sizeof(m_addr)) < 0) {
     perror("bind");
     ::close(m_socket);
@@ -103,7 +102,6 @@ void CANSocket::close() {
 }
 
 bool CANSocket::sendMessage(uint32_t id, const std::vector<uint8_t> &data) {
-  // Try write without lock first
   if (!m_isSocketValid) {
     std::cerr << "[CANSocket] Socket not valid, skipping send." << std::endl;
     return false;
