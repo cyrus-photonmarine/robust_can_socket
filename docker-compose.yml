@@ -1,0 +1,5 @@
+services:
+  can-tester:
+    build: .
+    container_name: socketcan-tranceiver 
+    network_mode: host
