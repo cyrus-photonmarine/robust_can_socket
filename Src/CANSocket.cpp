@@ -29,9 +29,7 @@ void CanMessage::print() const {
 }
 
 CANSocket::CANSocket(const std::string &interfaceName)
-    : m_interfaceName(interfaceName), m_socket(-1), m_rxFailureCount(0),
-      m_txFailureCount(0) {}
-
+    : m_interfaceName(interfaceName), m_socket(-1) {}
 CANSocket::~CANSocket() { close(); }
 
 bool CANSocket::initialize() {
@@ -127,7 +125,6 @@ bool CANSocket::sendMessage(uint32_t id, const std::vector<uint8_t> &data) {
 
     ssize_t bytes_written = write(m_socket, &frame, sizeof(frame));
     if (bytes_written == sizeof(frame)) {
-      m_txFailureCount = 0;
       return true;
     } else {
       perror("CANSocket write failed");

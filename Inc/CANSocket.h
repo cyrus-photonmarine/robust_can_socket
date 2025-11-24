@@ -47,8 +47,6 @@ private:
   struct sockaddr_can m_addr;
   struct ifreq m_ifr;
   std::mutex m_socketMutex;
-  int m_rxFailureCount;
-  int m_txFailureCount;
   std::atomic<bool> m_isSocketValid{true};
 };
 } // namespace socketcan
