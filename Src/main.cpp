@@ -24,8 +24,6 @@ std::queue<socketcan::CanMessage> tx_queue;
 std::condition_variable tx_queue_empty;
 
 void tx_queue_message_push(const socketcan::CanMessage &msg) {
-  std::cout << "[SEND] Enqueueing ID: 0x" << std::hex << msg.id << std::dec
-            << std::endl;
   std::unique_lock<std::mutex> lock(tx_queue_mutex);
   tx_queue.push(msg);
   lock.unlock();
@@ -34,18 +32,16 @@ void tx_queue_message_push(const socketcan::CanMessage &msg) {
 
 void sendLoop(socketcan::CANSocket *socket) {
   while (running) {
-    std::cout << "[SEND] Waiting..." << std::endl;
     std::unique_lock<std::mutex> lock(tx_queue_mutex);
-    tx_queue_empty.wait(lock, [] { return !tx_queue.empty(); });
-    do {
-      std::cout << "[SEND] Sending..." << tx_queue.size() << std::endl;
-      socketcan::CanMessage msg = tx_queue.front();
-      if (!socket->sendMessage(msg.id, msg.toVector())) {
-        std::cerr << "[SEND] Failed to send ID: 0x" << std::hex << msg.id
-                  << std::dec << std::endl;
-      }
-      tx_queue.pop();
-    } while (!tx_queue.empty());
+    tx_queue_empty.wait_for(lock, std::chrono::milliseconds(100),
+                            [] { return !tx_queue.empty(); });
+    socketcan::CanMessage msg = tx_queue.front();
+    msg.print();
+    if (!socket->sendMessage(msg.id, msg.toVector())) {
+      std::cerr << "[SEND] Failed to send ID: 0x" << std::hex << msg.id
+                << std::dec << std::endl;
+    }
+    tx_queue.pop();
   }
   std::cout << "[SEND] Exiting Send Loop" << std::endl;
 }
@@ -71,15 +67,15 @@ void recvLoop(socketcan::CANSocket *socket) {
   }
 }
 
-void socketcan_tranceiver() {
+void socketcan_tranceiver(const std::vector<socketcan::CanMessage> &msgs) {
+  /*  const socketcan::CanMessage msgs[] = {
+               socketcan::CanMessage(0x100, {0, 1, 2, 3, 4, 5, 6, 7}),
+               socketcan::CanMessage(0x101, {1, 2, 3, 4, 5, 6, 7, 8}),
+               socketcan::CanMessage(0x102, {2, 3, 4, 5, 6, 7, 8, 9}),
+           };*/
   while (running) {
-    for (auto &msg : {
-             socketcan::CanMessage(0x100, {0, 1, 2, 3, 4, 5, 6, 7}),
-             socketcan::CanMessage(0x101, {1, 2, 3, 4, 5, 6, 7, 8}),
-             socketcan::CanMessage(0x102, {2, 3, 4, 5, 6, 7, 8, 9}),
-         }) {
+    for (const auto &msg : msgs) {
       tx_queue_message_push(msg);
-      std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
   }
   std::cout << "Run Goodbye" << std::endl;
@@ -98,18 +94,23 @@ int main() {
     std::cerr << "Failed to initialize CAN interface\n";
     return 1;
   }
+  const std::vector<socketcan::CanMessage> msgs = {
+      socketcan::CanMessage(0x100, {0, 1, 2, 3, 4, 5, 6, 7}),
+      socketcan::CanMessage(0x101, {1, 2, 3, 4, 5, 6, 7, 8}),
+      socketcan::CanMessage(0x102, {2, 3, 4, 5, 6, 7, 8, 9}),
+  };
 
-  // std::thread rx(recvLoop, &socket);
+  std::thread rx(recvLoop, &socket);
   std::thread tx(sendLoop, &socket);
-  std::thread runloop(socketcan_tranceiver);
+  std::thread runloop(socketcan_tranceiver, msgs);
 
   std::cout << "Running... Press Enter to exit.\n";
   std::cin.get();
   running = false;
 
+  rx.join();
   tx.join();
   runloop.join();
 
-  // rx.join();
   return 0;
 }
