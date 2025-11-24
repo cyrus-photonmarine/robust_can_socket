@@ -22,7 +22,7 @@ std::vector<uint8_t> CanMessage::toVector() const {
 }
 
 void CanMessage::print() const {
-  std::cout << "[RECV] ID: 0x" << std::hex << id << "  Data:";
+  std::cout << "[MSG] ID: 0x" << std::hex << id << "  Data:";
   for (int i = 0; i < dlc; ++i)
     std::cout << " " << std::hex << static_cast<int>(data[i]);
   std::cout << std::dec << std::endl;
