@@ -11,11 +11,7 @@
 #include <thread>
 #include <vector>
 
-constexpr int TX_MSGS_LEN = 3;
-std::array<int, TX_MSGS_LEN> sampleTimes = {10, 20, 100}; // ms
-
-std::atomic<bool> running{true};
-
+std::atomic<bool> running{false};
 std::array<uint32_t, 8> RX_IDS = {0x101, 0x102, 0x103, 0x201,
                                   0x202, 0x203, 0x301, 0x302};
 
@@ -68,11 +64,6 @@ void recvLoop(socketcan::CANSocket *socket) {
 }
 
 void socketcan_tranceiver(const std::vector<socketcan::CanMessage> &msgs) {
-  /*  const socketcan::CanMessage msgs[] = {
-               socketcan::CanMessage(0x100, {0, 1, 2, 3, 4, 5, 6, 7}),
-               socketcan::CanMessage(0x101, {1, 2, 3, 4, 5, 6, 7, 8}),
-               socketcan::CanMessage(0x102, {2, 3, 4, 5, 6, 7, 8, 9}),
-           };*/
   while (running) {
     for (const auto &msg : msgs) {
       tx_queue_message_push(msg);
@@ -88,17 +79,19 @@ void signalHandler(int) {
 
 int main() {
   std::signal(SIGINT, signalHandler);
-
   socketcan::CANSocket socket("vcan0");
-  if (!socket.initialize()) {
-    std::cerr << "Failed to initialize CAN interface\n";
-    return 1;
-  }
+
   const std::vector<socketcan::CanMessage> msgs = {
       socketcan::CanMessage(0x100, {0, 1, 2, 3, 4, 5, 6, 7}),
       socketcan::CanMessage(0x101, {1, 2, 3, 4, 5, 6, 7, 8}),
       socketcan::CanMessage(0x102, {2, 3, 4, 5, 6, 7, 8, 9}),
   };
+
+  if (!socket.initialize()) {
+    std::cerr << "Failed to initialize CAN interface\n";
+    return 1;
+  }
+  running = true;
 
   std::thread rx(recvLoop, &socket);
   std::thread tx(sendLoop, &socket);
