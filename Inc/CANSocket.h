@@ -21,6 +21,7 @@
 #include <vector>
 
 namespace socketcan {
+
 struct CanMessage {
   uint32_t id;
   uint8_t dlc;
@@ -37,7 +38,6 @@ class CANSocket {
 public:
   CANSocket(const std::string &interfaceName);
   ~CANSocket();
-
   bool initialize();
   void close();
   bool sendMessage(uint32_t id, const std::vector<uint8_t> &data);
@@ -49,33 +49,7 @@ private:
   std::unique_ptr<Impl> pimpl;
 };
 
-template <typename T> class ThreadSafeQueue {
-private:
-  std::queue<T> m_queue;
-  mutable std::mutex m_mutex;
-  std::condition_variable m_queue_empty;
-
-public:
-  void push(const T &val) {
-    std::unique_lock<std::mutex> lock(m_mutex);
-    m_queue.push(std::move(val));
-    lock.unlock();
-    m_queue_empty.notify_one();
-  }
-
-  std::optional<T> pop() {
-    std::unique_lock<std::mutex> lock(m_mutex);
-    m_queue_empty.wait_for(lock, std::chrono::milliseconds(100),
-                           [this] { return !m_queue.empty(); });
-    if (m_queue.empty())
-      return std::nullopt;
-    T value = std::move(m_queue.front());
-    m_queue.pop();
-    return value;
-  }
-};
-
-class Transmitter : public CANSocket {
+class Transmitter {
 public:
   Transmitter(const std::string &interfaceName);
   ~Transmitter();
@@ -84,10 +58,8 @@ public:
   void send(const CanMessage &msg);
 
 private:
-  ThreadSafeQueue<CanMessage> m_queue;
-  std::atomic<bool> m_running;
-  std::thread m_handle;
-  void runloop();
+  struct Impl;
+  std::unique_ptr<Impl> pimpl;
 };
 
 } // namespace socketcan

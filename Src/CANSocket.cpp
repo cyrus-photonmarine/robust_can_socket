@@ -201,24 +201,63 @@ bool CANSocket::Impl::receiveMessage(uint32_t &id, std::vector<uint8_t> &data,
   return true;
 }
 
-Transmitter::Transmitter(const std::string &interfaceName)
-    : socketcan::CANSocket(interfaceName), m_running(false) {}
-Transmitter::~Transmitter() {
-  m_running = false;
-  close();
-  if (m_handle.joinable()) {
-    m_handle.join();
+template <typename T> class ThreadSafeQueue {
+private:
+  std::queue<T> m_queue;
+  mutable std::mutex m_mutex;
+  std::condition_variable m_queue_empty;
+
+public:
+  void push(const T &val) {
+    std::unique_lock<std::mutex> lock(m_mutex);
+    m_queue.push(std::move(val));
+    lock.unlock();
+    m_queue_empty.notify_one();
   }
-}
-void Transmitter::start() {
+
+  std::optional<T> pop() {
+    std::unique_lock<std::mutex> lock(m_mutex);
+    m_queue_empty.wait_for(lock, std::chrono::milliseconds(100),
+                           [this] { return !m_queue.empty(); });
+    if (m_queue.empty())
+      return std::nullopt;
+    T value = std::move(m_queue.front());
+    m_queue.pop();
+    return value;
+  }
+};
+
+class Transmitter::Impl : public CANSocket {
+public:
+  Impl(const std::string &interfaceName)
+      : socketcan::CANSocket(interfaceName), m_running(false) {}
+  void start();
+  void stop();
+  void send(const CanMessage &msg);
+
+private:
+  ThreadSafeQueue<CanMessage> m_queue;
+  std::atomic<bool> m_running;
+  std::thread m_handle;
+  void runloop();
+};
+
+Transmitter::Transmitter(const std::string &interfaceName)
+    : pimpl(std::make_unique<Impl>(interfaceName)) {}
+Transmitter::~Transmitter() { pimpl->close(); }
+void Transmitter::start() { pimpl->start(); }
+void Transmitter::stop() { pimpl->stop(); }
+void Transmitter::send(const CanMessage &msg) { pimpl->send(msg); }
+
+void Transmitter::Impl::start() {
   if (!m_running) {
     initialize();
     m_running = true;
-    m_handle = std::thread(&Transmitter::runloop, this);
+    m_handle = std::thread(&Transmitter::Impl::runloop, this);
   }
 }
 
-void Transmitter::stop() {
+void Transmitter::Impl::stop() {
   if (m_running) {
     m_running = false;
     if (m_handle.joinable()) {
@@ -227,10 +266,11 @@ void Transmitter::stop() {
   }
 }
 
-void Transmitter::send(const socketcan::CanMessage &msg) {
+void Transmitter::Impl::send(const socketcan::CanMessage &msg) {
   m_queue.push(std::move(msg));
 }
-void Transmitter::runloop() {
+
+void Transmitter::Impl::runloop() {
   CanMessage msg;
   while (m_running) {
     std::optional<CanMessage> m = m_queue.pop();
