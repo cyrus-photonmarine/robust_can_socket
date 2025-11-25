@@ -1,19 +1,11 @@
 #include "CANSocket.h"
 #include <algorithm>
-#include <array>
 #include <atomic>
-#include <chrono>
-#include <condition_variable>
 #include <csignal>
 #include <iostream>
-#include <mutex>
-#include <optional>
 #include <queue>
 #include <thread>
 #include <vector>
-
-std::array<uint32_t, 8> RX_IDS = {0x101, 0x102, 0x103, 0x201,
-                                  0x202, 0x203, 0x301, 0x302};
 
 std::atomic<bool> running{false};
 socketcan::Transmitter can_transmitter("vcan0");
