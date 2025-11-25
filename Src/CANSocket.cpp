@@ -8,6 +8,7 @@
 #include <unistd.h>
 
 namespace socketcan {
+
 CanMessage::CanMessage() : id(0), dlc(0), data{0}, timestamp_us(0) {}
 CanMessage::CanMessage(uint32_t msg_id, const std::vector<uint8_t> &vec_data,
                        uint64_t ts)
@@ -169,5 +170,49 @@ bool CANSocket::receiveMessage(uint32_t &id, std::vector<uint8_t> &data,
                   .count();
 
   return true;
+}
+
+Transmitter::Transmitter(const std::string &interfaceName)
+    : socketcan::CANSocket(interfaceName), m_running(false) {}
+Transmitter::~Transmitter() {
+  m_running = false;
+  close();
+  if (m_handle.joinable()) {
+    m_handle.join();
+  }
+}
+void Transmitter::start() {
+  if (!m_running) {
+    initialize();
+    m_running = true;
+    m_handle = std::thread(&Transmitter::runloop, this);
+  }
+}
+
+void Transmitter::stop() {
+  if (m_running) {
+    m_running = false;
+    if (m_handle.joinable()) {
+      m_handle.join();
+    }
+  }
+}
+
+void Transmitter::send(const socketcan::CanMessage &msg) {
+  m_queue.push(std::move(msg));
+}
+void Transmitter::runloop() {
+  CanMessage msg;
+  while (m_running) {
+    std::optional<CanMessage> m = m_queue.pop();
+    if (m.has_value()) {
+      msg = *m;
+      msg.print();
+      if (!sendMessage(msg.id, msg.toVector())) {
+        std::cerr << "[SEND] Failed to send ID: 0x" << std::hex << msg.id
+                  << std::dec << std::endl;
+      }
+    }
+  }
 }
 } // namespace socketcan
