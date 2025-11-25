@@ -7,37 +7,55 @@
 #include <csignal>
 #include <iostream>
 #include <mutex>
+#include <optional>
 #include <queue>
 #include <thread>
 #include <vector>
 
-std::atomic<bool> running{false};
 std::array<uint32_t, 8> RX_IDS = {0x101, 0x102, 0x103, 0x201,
                                   0x202, 0x203, 0x301, 0x302};
 
-std::mutex tx_queue_mutex;
-std::queue<socketcan::CanMessage> tx_queue;
-std::condition_variable tx_queue_empty;
+template <typename T> class ThreadSafeQueue {
+private:
+  std::queue<T> m_queue;
+  mutable std::mutex m_mutex;
+  std::condition_variable m_queue_empty;
 
-void tx_queue_message_push(const socketcan::CanMessage &msg) {
-  std::unique_lock<std::mutex> lock(tx_queue_mutex);
-  tx_queue.push(msg);
-  lock.unlock();
-  tx_queue_empty.notify_one();
-}
+public:
+  void push(const T &val) {
+    std::unique_lock<std::mutex> lock(m_mutex);
+    m_queue.push(std::move(val));
+    lock.unlock();
+    m_queue_empty.notify_one();
+  }
+
+  std::optional<T> pop() {
+    std::unique_lock<std::mutex> lock(m_mutex);
+    m_queue_empty.wait_for(lock, std::chrono::milliseconds(100),
+                           [this] { return !m_queue.empty(); });
+    if (m_queue.empty())
+      return std::nullopt;
+    T value = std::move(m_queue.front());
+    m_queue.pop();
+    return value;
+  }
+};
+
+std::atomic<bool> running{false};
+ThreadSafeQueue<socketcan::CanMessage> tsq;
 
 void sendLoop(socketcan::CANSocket *socket) {
+  socketcan::CanMessage msg;
   while (running) {
-    std::unique_lock<std::mutex> lock(tx_queue_mutex);
-    tx_queue_empty.wait_for(lock, std::chrono::milliseconds(100),
-                            [] { return !tx_queue.empty(); });
-    socketcan::CanMessage msg = tx_queue.front();
-    msg.print();
-    if (!socket->sendMessage(msg.id, msg.toVector())) {
-      std::cerr << "[SEND] Failed to send ID: 0x" << std::hex << msg.id
-                << std::dec << std::endl;
+    std::optional<socketcan::CanMessage> m = tsq.pop();
+    if (m.has_value()) {
+      msg = *m;
+      msg.print();
+      if (!socket->sendMessage(msg.id, msg.toVector())) {
+        std::cerr << "[SEND] Failed to send ID: 0x" << std::hex << msg.id
+                  << std::dec << std::endl;
+      }
     }
-    tx_queue.pop();
   }
   std::cout << "[SEND] Exiting Send Loop" << std::endl;
 }
@@ -66,7 +84,7 @@ void recvLoop(socketcan::CANSocket *socket) {
 void socketcan_tranceiver(const std::vector<socketcan::CanMessage> &msgs) {
   while (running) {
     for (const auto &msg : msgs) {
-      tx_queue_message_push(msg);
+      tsq.push();
     }
   }
   std::cout << "Run Goodbye" << std::endl;
