@@ -1,23 +1,9 @@
 #ifndef CANSOCKET_H_
 #define CANSOCKET_H_
 
-#include <atomic>
-#include <chrono>
-#include <condition_variable>
-#include <csignal>
-#include <cstdint>
-#include <iostream>
-#include <linux/can.h>
-#include <linux/can/raw.h>
 #include <memory>
-#include <mutex>
-#include <net/if.h>
-#include <optional>
-#include <queue>
 #include <string>
-#include <sys/ioctl.h>
-#include <sys/socket.h>
-#include <thread>
+#include <cstdint>
 #include <vector>
 
 namespace socketcan {
