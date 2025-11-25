@@ -9,6 +9,7 @@
 #include <iostream>
 #include <linux/can.h>
 #include <linux/can/raw.h>
+#include <memory>
 #include <mutex>
 #include <net/if.h>
 #include <optional>
@@ -19,12 +20,7 @@
 #include <thread>
 #include <vector>
 
-#define BodyCAN "can3"
-#define SensorCAN "can1"
-#define Steering_Motor_CAN "can2"
-
 namespace socketcan {
-
 struct CanMessage {
   uint32_t id;
   uint8_t dlc;
@@ -49,12 +45,8 @@ public:
                       uint64_t &timestamp);
 
 private:
-  std::string m_interfaceName;
-  int m_socket;
-  struct sockaddr_can m_addr;
-  struct ifreq m_ifr;
-  std::mutex m_socketMutex;
-  std::atomic<bool> m_isSocketValid{true};
+  struct Impl;
+  std::unique_ptr<Impl> pimpl;
 };
 
 template <typename T> class ThreadSafeQueue {

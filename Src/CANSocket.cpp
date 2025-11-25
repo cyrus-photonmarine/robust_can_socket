@@ -29,11 +29,39 @@ void CanMessage::print() const {
   std::cout << std::dec << std::endl;
 }
 
-CANSocket::CANSocket(const std::string &interfaceName)
-    : m_interfaceName(interfaceName), m_socket(-1) {}
-CANSocket::~CANSocket() { close(); }
+class CANSocket::Impl {
+public:
+  Impl(const std::string &interfaceName)
+      : m_interfaceName(interfaceName), m_socket(-1) {}
+  bool initialize();
+  void close();
+  bool sendMessage(uint32_t id, const std::vector<uint8_t> &data);
+  bool receiveMessage(uint32_t &id, std::vector<uint8_t> &data,
+                      uint64_t &timestamp);
 
-bool CANSocket::initialize() {
+private:
+  std::string m_interfaceName;
+  int m_socket;
+  struct sockaddr_can m_addr;
+  struct ifreq m_ifr;
+  std::mutex m_socketMutex;
+  std::atomic<bool> m_isSocketValid{true};
+};
+
+CANSocket::CANSocket(const std::string &interfaceName)
+    : pimpl(std::make_unique<Impl>(interfaceName)) {}
+CANSocket::~CANSocket() { pimpl->close(); }
+bool CANSocket::initialize() { return pimpl->initialize(); }
+void CANSocket::close() { pimpl->close(); }
+bool CANSocket::sendMessage(uint32_t id, const std::vector<uint8_t> &data) {
+  return pimpl->sendMessage(id, data);
+}
+bool CANSocket::receiveMessage(uint32_t &id, std::vector<uint8_t> &data,
+                               uint64_t &timestamp) {
+  return pimpl->receiveMessage(id, data, timestamp);
+}
+
+bool CANSocket::Impl::initialize() {
   std::lock_guard<std::mutex> lock(m_socketMutex);
   m_isSocketValid = false;
   const int restart_ms = 100;
@@ -89,7 +117,7 @@ bool CANSocket::initialize() {
   return true;
 }
 
-void CANSocket::close() {
+void CANSocket::Impl::close() {
   std::lock_guard<std::mutex> lock(m_socketMutex);
 
   if (m_socket >= 0) {
@@ -100,7 +128,8 @@ void CANSocket::close() {
   m_isSocketValid = false;
 }
 
-bool CANSocket::sendMessage(uint32_t id, const std::vector<uint8_t> &data) {
+bool CANSocket::Impl::sendMessage(uint32_t id,
+                                  const std::vector<uint8_t> &data) {
   if (!m_isSocketValid) {
     std::cerr << "[CANSocket] Socket not valid, skipping send." << std::endl;
     return false;
@@ -145,8 +174,8 @@ bool CANSocket::sendMessage(uint32_t id, const std::vector<uint8_t> &data) {
   return false;
 }
 
-bool CANSocket::receiveMessage(uint32_t &id, std::vector<uint8_t> &data,
-                               uint64_t &timestamp) {
+bool CANSocket::Impl::receiveMessage(uint32_t &id, std::vector<uint8_t> &data,
+                                     uint64_t &timestamp) {
   std::lock_guard<std::mutex> lock(m_socketMutex);
 
   if (!m_isSocketValid || m_socket < 0) {
