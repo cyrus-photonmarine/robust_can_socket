@@ -1,4 +1,5 @@
 #include "CANSocket.h"
+#include "thread_safe_queue.hpp"
 #include <fcntl.h>
 #include <atomic>
 #include <chrono>
@@ -210,6 +211,7 @@ bool CANSocket::Impl::receiveMessage(uint32_t &id, std::vector<uint8_t> &data,
   return true;
 }
 
+/*
 template <typename T> class ThreadSafeQueue {
 private:
   std::queue<T> m_queue;
@@ -235,7 +237,7 @@ public:
     return value;
   }
 };
-
+*/
 
 class Transmitter::Impl : public CANSocket {
 public:
