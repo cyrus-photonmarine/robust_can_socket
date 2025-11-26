@@ -1,9 +1,9 @@
 #include "CANSocket.h"
 
-#include <fcntl.h>
 #include <atomic>
 #include <chrono>
 #include <cstring>
+#include <fcntl.h>
 #include <iostream>
 #include <linux/can.h>
 #include <linux/can/raw.h>
@@ -17,7 +17,6 @@
 #include "thread_safe_queue.hpp"
 
 namespace socketcan {
-
 CanMessage::CanMessage() : id(0), dlc(0), data{0}, timestamp_us(0) {}
 CanMessage::CanMessage(uint32_t msg_id, const std::vector<uint8_t> &vec_data,
                        uint64_t ts)
@@ -217,9 +216,10 @@ public:
   void start();
   void stop();
   void send(const CanMessage &msg);
+  bool receive(CanMessage &msg);
 
 private:
-  ThreadSafeQueue<CanMessage> m_queue;
+  ThreadSafeQueue<CanMessage> m_queue, m_recv_queue;
   std::atomic<bool> m_running;
   std::thread m_handle;
   void runloop();
@@ -231,6 +231,7 @@ Transmitter::~Transmitter() { pimpl->close(); }
 void Transmitter::start() { pimpl->start(); }
 void Transmitter::stop() { pimpl->stop(); }
 void Transmitter::send(const CanMessage &msg) { pimpl->send(msg); }
+bool Transmitter::receive(CanMessage &msg) { return pimpl->receive(msg); }
 
 void Transmitter::Impl::start() {
   if (!m_running) {
@@ -249,21 +250,42 @@ void Transmitter::Impl::stop() {
   }
 }
 
-void Transmitter::Impl::send(const socketcan::CanMessage &msg) {
+void Transmitter::Impl::send(const CanMessage &msg) {
   m_queue.push(std::move(msg));
 }
 
+bool Transmitter::Impl::receive(CanMessage &msg) {
+  std::optional<CanMessage> m = m_recv_queue.pop();
+  if (m.has_value()) {
+    msg = *m;
+    return true;
+  }
+  return false;
+}
+
 void Transmitter::Impl::runloop() {
+  uint32_t id;
+  std::vector<uint8_t> data;
+  uint64_t timestamp;
   CanMessage msg;
+
   while (m_running) {
     std::optional<CanMessage> m = m_queue.pop();
     if (m.has_value()) {
       msg = *m;
-      msg.print();
       if (!sendMessage(msg.id, msg.toVector())) {
         std::cerr << "[SEND] Failed to send ID: 0x" << std::hex << msg.id
                   << std::dec << std::endl;
       }
+    }
+
+    if (receiveMessage(id, data, timestamp)) {
+      m_recv_queue.push(std::move(CanMessage(id, data, timestamp)));
+    } else if (errno == ENOBUFS || errno == ENETDOWN) {
+      std::cerr << "[RECV] Socket error, restarting...\n";
+      close();
+      std::this_thread::sleep_for(std::chrono::milliseconds(200));
+      initialize();
     }
   }
 }

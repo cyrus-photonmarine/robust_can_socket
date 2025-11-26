@@ -10,7 +10,11 @@
 
 // Loop through a given vector of CAN messages in thread.
 std::atomic<bool> running{false};
-socketcan::Transmitter can_transmitter("vcan0");
+
+// Set up a test loop in hardware - CAN1 receives from CAN0.
+socketcan::Transmitter can_transmitter("can0"), can_listener("can1");
+
+// CAN0 sends messages in a loop.
 void socketcan_tranceiver(const std::vector<socketcan::CanMessage> &msgs) {
   while (running) {
     for (const auto &msg : msgs) {
@@ -18,9 +22,22 @@ void socketcan_tranceiver(const std::vector<socketcan::CanMessage> &msgs) {
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
   }
-  std::cout << "Run Goodbye" << std::endl;
+  std::cout << "Exiting Send Thread." << std::endl;
 }
 
+// Listen for messages received on CAN1.  Should receive what was sent on CAN0.
+void socketcan_listener() {
+  socketcan::CanMessage msg;
+  while (running) {
+    if (can_listener.receive(msg)) {
+      std::cout << "Received: " << std::endl;
+      msg.print();
+    }
+  }
+  std::cout << "Exiting Listener Thread." << std::endl;
+}
+
+// Nuke it from high orbit. Only way to be sure.
 void signalHandler(int) {
   running = false;
   std::cout << "Stopping...\n";
@@ -36,12 +53,19 @@ int main() {
       socketcan::CanMessage(0x102, {2, 3, 4, 5, 6, 7, 8, 9}),
   };
 
-  /* Fire up the transmit queue service */
+  /* Fire up the transmit queue service on CAN0 */
   can_transmitter.start();
+
+  /* Set up a listener service on CAN1 */
+  can_listener.start();
+
   running = true;
 
-  /* Fire up the message-producer service */
+  /* Fire up the message-producer service CAN0 */
   std::thread send_loop(socketcan_tranceiver, msgs);
+
+  /* Monitor receive queue on CAN1 */
+  std::thread recv_loop(socketcan_listener);
 
   /* Block until exit requested by user. */
   std::cout << "Running... Press Enter to exit.\n";
@@ -50,7 +74,9 @@ int main() {
   /* Break running loops and exit all threads. */
   running = false;
   can_transmitter.stop();
+  can_listener.stop();
   send_loop.join();
+  recv_loop.join();
 
   return 0;
 }

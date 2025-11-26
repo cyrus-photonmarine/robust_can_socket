@@ -1,9 +1,9 @@
 #ifndef CANSOCKET_H_
 #define CANSOCKET_H_
 
+#include <cstdint>
 #include <memory>
 #include <string>
-#include <cstdint>
 #include <vector>
 
 namespace socketcan {
@@ -42,6 +42,7 @@ public:
   void start();
   void stop();
   void send(const CanMessage &msg);
+  bool receive(CanMessage &msg);
 
 private:
   struct Impl;
