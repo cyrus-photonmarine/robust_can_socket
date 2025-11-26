@@ -23,6 +23,6 @@ RUN apt-get update && apt-get install -y \
 	&& rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY --from=builder /app/build/robust_can_socket .
-CMD [ "./robust_can_socket" ]
+COPY --from=builder /app/build/sendloop .
+CMD [ "./sendloop" ]
 
